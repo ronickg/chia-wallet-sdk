@@ -17,6 +17,7 @@ use chia_wallet_sdk::{
     ReserveFee, SendMessage, Softfork, SpendContext,
 };
 use clvmr::{
+    chia_dialect::ENABLE_KECCAK_OPS_OUTSIDE_GUARD,
     run_program,
     serde::{node_from_bytes, node_from_bytes_backrefs},
     ChiaDialect, NodePtr, MEMPOOL_MODE,
@@ -79,7 +80,7 @@ impl ClvmAllocator {
         max_cost: BigInt,
         mempool_mode: bool,
     ) -> Result<Output> {
-        let mut flags = 0;
+        let mut flags = ENABLE_KECCAK_OPS_OUTSIDE_GUARD;
 
         if mempool_mode {
             flags |= MEMPOOL_MODE;
