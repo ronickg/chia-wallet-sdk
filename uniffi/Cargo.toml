@@ -1,0 +1,27 @@
+[package]
+name = "chia-wallet-sdk-uniffi"
+version = "0.0.0"
+edition = "2021"
+
+[[bin]]
+# This can be whatever name makes sense for your project, but the rest of this tutorial assumes uniffi-bindgen.
+name = "uniffi-bindgen"
+path = "uniffi-bindgen.rs"
+
+[lints]
+workspace = true
+
+[lib]
+crate-type = ["staticlib"]
+name = "chia_wallet_sdk_uniffi"
+
+[dependencies]
+bip39 = { workspace = true, features = ["rand", "rand_core"] }
+chia-wallet-sdk = { workspace = true }
+chia = { workspace = true }
+clvmr = { workspace = true }
+num-bigint = { workspace = true }
+hex = { workspace = true }
+paste = { workspace = true }
+uniffi = { workspace = true, features = ["bindgen", "cli"] }
+thiserror = { workspace = true }
