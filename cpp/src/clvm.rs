@@ -8,7 +8,7 @@ use clvmr::{
     Allocator, NodePtr,
 };
 
-use crate::{NodePtrWrapper, Program};
+use crate::{clvm_value::Allocate, ffi::ClvmResult, ClvmValue, NodePtrWrapper, Program};
 
 pub struct ClvmAllocator(pub(crate) SpendContext);
 
@@ -39,6 +39,30 @@ pub fn nil(allocator: &mut ClvmAllocator) -> Result<Box<Program>, String> {
         ptr: NodePtrWrapper::from(NodePtr::NIL),
     }))
 }
+
+pub fn alloc(allocator: &mut ClvmAllocator, value: &ClvmValue) -> Result<Box<Program>, String> {
+    match value.allocate(allocator) {
+        Ok(ptr) => Ok(Box::new(Program {
+            ctx: allocator, // Use the passed allocator directly
+            ptr,
+        })),
+        Err(e) => Err(e.to_string()),
+    }
+}
+// pub fn alloc(allocator: &mut ClvmAllocator, value: &ClvmValue) -> ClvmResult {
+//     match value.allocate(allocator) {
+//         Ok(ptr) => ClvmResult {
+//             success: true,
+//             error: String::new(),
+//             node_ptr_value: Box::new(ptr),
+//         },
+//         Err(e) => ClvmResult {
+//             success: false,
+//             error: e.to_string(),
+//             node_ptr_value: Box::new(NodePtrWrapper::from(NodePtr::NIL)),
+//         },
+//     }
+// }
 
 pub fn deserialize_with_backrefs(
     allocator: &mut ClvmAllocator,

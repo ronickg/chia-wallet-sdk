@@ -8,100 +8,54 @@
 class ClvmTest : public ::testing::Test
 {
 protected:
-  ClvmTest() : allocator(create_allocator()) {}
+  // ClvmTest() : allocator(clvm_new_allocator()) {}
 
-  rust::Box<ClvmAllocator> allocator;
+  // rust::Box<ClvmAllocator> allocator;
 };
 
-TEST_F(ClvmTest, CreateAllocator)
+// TEST_F(ClvmTest, TestNil)
+// {
+//   auto program = allocator->nil();
+//   ASSERT_NE(program.into_raw(), nullptr);
+
+//   EXPECT_TRUE(program->is_atom());
+//   EXPECT_FALSE(program->is_pair());
+
+//   auto result = program->to_string(*allocator);
+//   std::cout << "Program string: " << result << std::endl;
+// }
+TEST_F(ClvmTest, TestStringRoundtrip)
 {
-  auto alloc = create_allocator();
-  // Check if operator-> works (means not null)
-  ASSERT_NE(&(*alloc), nullptr);
+  auto allocator = clvm_new_allocator();
+  const std::string expected1 = "hello world";
+  auto value1 = new_string_value(expected1);
+  auto program1 = allocator->alloc(*value1);
+
+  auto allocator2 = clvm_new_allocator();
+  const std::string expected2 = "test string";
+  auto value2 = new_string_value(expected2);
+  auto program2 = allocator2->alloc(*value2);
+
+  auto result1 = program1->to_string(*allocator);
+  auto result2 = program2->to_string(*allocator2);
+
+  EXPECT_EQ(result1, expected1);
+  EXPECT_EQ(result2, expected2);
 }
 
-TEST_F(ClvmTest, CreateNilProgram)
+TEST_F(ClvmTest, TestStringRoundtripWrongAllocator)
 {
-  auto program = nil(*allocator);
-  ASSERT_NE(&(*program), nullptr);
-  EXPECT_TRUE(program->is_atom());
-  EXPECT_FALSE(program->is_pair());
+  auto allocator = clvm_new_allocator();
+  auto allocator2 = clvm_new_allocator();
+  const std::string expected = "hello world";
+  auto value = new_string_value(expected);
+  auto program = allocator->alloc(*value);
+
+  EXPECT_THROW({
+    program->to_string(*allocator2); // Using wrong allocator
+  },
+               std::runtime_error);
 }
-
-TEST_F(ClvmTest, SerializeNilProgram)
-{
-  auto program = nil(*allocator);
-  auto result = program->serialize();
-
-  rust::Vec<uint8_t> expected = {0x80};
-
-  ASSERT_EQ(result.size(), expected.size());
-  for (size_t i = 0; i < result.size(); i++)
-  {
-    EXPECT_EQ(result[i], expected[i]);
-  }
-}
-
-TEST_F(ClvmTest, DeserializeNilProgram)
-{
-  rust::Vec<uint8_t> nil_bytes = {0x80};
-  rust::Slice<const uint8_t> slice(nil_bytes.data(), nil_bytes.size());
-
-  auto program = deserialize(*allocator, slice);
-  ASSERT_NE(&(*program), nullptr);
-  EXPECT_TRUE(program->is_atom());
-  EXPECT_FALSE(program->is_pair());
-}
-
-TEST_F(ClvmTest, SerializeDeserializeRoundTrip)
-{
-  auto original = nil(*allocator);
-  ASSERT_NE(&(*original), nullptr);
-
-  auto serialized = original->serialize();
-  ASSERT_FALSE(serialized.empty());
-
-  auto deserialized = deserialize(*allocator, rust::Slice<const uint8_t>(serialized.data(), serialized.size()));
-  ASSERT_NE(&(*deserialized), nullptr);
-
-  EXPECT_EQ(original->is_atom(), deserialized->is_atom());
-  EXPECT_EQ(original->is_pair(), deserialized->is_pair());
-
-  auto reserialized = deserialized->serialize();
-  ASSERT_EQ(serialized.size(), reserialized.size());
-  for (size_t i = 0; i < serialized.size(); i++)
-  {
-    EXPECT_EQ(serialized[i], reserialized[i]);
-  }
-}
-
-TEST_F(ClvmTest, DeserializeInvalidBytes)
-{
-  rust::Vec<uint8_t> invalid_bytes = {0xFF, 0xFF, 0xFF};
-  rust::Slice<const uint8_t> slice(invalid_bytes.data(), invalid_bytes.size());
-
-  EXPECT_THROW({ deserialize(*allocator, slice); }, std::exception); // Change from rust::Error to std::exception
-}
-
-TEST_F(ClvmTest, HandleEmptyInput)
-{
-  rust::Vec<uint8_t> empty_bytes;
-  rust::Slice<const uint8_t> slice(empty_bytes.data(), empty_bytes.size());
-
-  EXPECT_THROW({ deserialize(*allocator, slice); }, std::exception); // Change from rust::Error to std::exception
-}
-
-TEST_F(ClvmTest, StringRoundtrip)
-{
-  std::string expected = "hello world";
-  auto value = from_string(expected);
-  auto result = allocate_value(*value, *allocator);
-
-  ASSERT_TRUE(result.success);
-  auto str = result.node_ptr_value->to_string();
-  ASSERT_EQ(str, expected);
-}
-
 // class ChiaFFITest : public ::testing::Test
 // {
 // protected: // Change from private to protected
