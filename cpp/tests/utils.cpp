@@ -91,6 +91,17 @@ TEST_F(ClvmTest, HandleEmptyInput)
   EXPECT_THROW({ deserialize(*allocator, slice); }, std::exception); // Change from rust::Error to std::exception
 }
 
+TEST_F(ClvmTest, StringRoundtrip)
+{
+  std::string expected = "hello world";
+  auto value = from_string(expected);
+  auto result = allocate_value(*value, *allocator);
+
+  ASSERT_TRUE(result.success);
+  auto str = result.node_ptr_value->to_string();
+  ASSERT_EQ(str, expected);
+}
+
 // class ChiaFFITest : public ::testing::Test
 // {
 // protected: // Change from private to protected

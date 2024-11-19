@@ -9,7 +9,7 @@ use clvmr::{
     Allocator, NodePtr, SExp,
 };
 
-use crate::types::OptionalVec;
+use crate::ffi::OptionalVec; // Add this line
 use crate::ClvmAllocator;
 
 // Wrapper type for NodePtr
