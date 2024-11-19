@@ -1,0 +1,2 @@
+/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ar qc libchia_wallet_sdk_cpp.a "CMakeFiles/chia_wallet_sdk_cpp.dir/Users/ronaldgoedeke/chia-wallet-sdk/target/cxxbridge/chia-wallet-sdk-c-bindings/src/lib.rs.cc.o"
+/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ranlib libchia_wallet_sdk_cpp.a

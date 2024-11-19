@@ -1,0 +1,5 @@
+/Users/ronaldgoedeke/chia-wallet-sdk/cpp/build/CMakeFiles/chia_wallet_sdk_cpp.dir
+/Users/ronaldgoedeke/chia-wallet-sdk/cpp/build/CMakeFiles/test_clvm.dir
+/Users/ronaldgoedeke/chia-wallet-sdk/cpp/build/CMakeFiles/test.dir
+/Users/ronaldgoedeke/chia-wallet-sdk/cpp/build/CMakeFiles/edit_cache.dir
+/Users/ronaldgoedeke/chia-wallet-sdk/cpp/build/CMakeFiles/rebuild_cache.dir

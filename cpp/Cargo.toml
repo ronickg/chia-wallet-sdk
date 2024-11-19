@@ -1,0 +1,30 @@
+[package]
+name = "chia-wallet-sdk-c-bindings"
+version = "0.0.0"
+edition = "2021"
+
+# [[bin]]
+# # This can be whatever name makes sense for your project, but the rest of this tutorial assumes uniffi-bindgen.
+# name = "c-bindings"
+# path = "c-bindings.rs"
+
+[lints.rust]
+unsafe_code = "allow"
+
+[lib]
+crate-type = ["staticlib", "cdylib"]
+name = "chia_wallet_sdk_cpp_bindings"
+
+[dependencies]
+bip39 = { workspace = true, features = ["rand", "rand_core"] }
+chia-wallet-sdk = { workspace = true }
+chia = { workspace = true }
+clvmr = { workspace = true }
+num-bigint = { workspace = true }
+hex = { workspace = true }
+paste = { workspace = true }
+thiserror = { workspace = true }
+cxx = "1.0"
+
+[build-dependencies]
+cxx-build = "1.0"
