@@ -5,6 +5,16 @@ use clvmr::{
     Allocator, NodePtr, SExp,
 };
 
+pub mod clvm;
+pub mod clvm_value;
+// pub mod coin;
+pub mod program;
+
+pub use clvm::*;
+pub use clvm_value::*;
+// pub use coin::*;
+pub use program::*;
+
 #[cxx::bridge]
 mod ffi {
     extern "Rust" {
@@ -25,182 +35,182 @@ mod ffi {
     }
 }
 
-pub struct ClvmAllocator(pub(crate) SpendContext);
+// pub struct ClvmAllocator(pub(crate) SpendContext);
 
-pub fn clvm_new_allocator() -> Box<ClvmAllocator> {
-    Box::new(ClvmAllocator(SpendContext::new()))
-}
+// pub fn clvm_new_allocator() -> Box<ClvmAllocator> {
+//     Box::new(ClvmAllocator(SpendContext::new()))
+// }
 
-impl ClvmAllocator {
-    pub fn new_allocator() -> Box<Self> {
-        Box::new(Self(SpendContext::new()))
-    }
+// impl ClvmAllocator {
+//     pub fn new_allocator() -> Box<Self> {
+//         Box::new(Self(SpendContext::new()))
+//     }
 
-    fn nil(&mut self) -> Box<Program> {
-        Box::new(Program::new(NodePtr::NIL))
-    }
+//     fn nil(&mut self) -> Box<Program> {
+//         Box::new(Program::new(NodePtr::NIL))
+//     }
 
-    fn deserialize(&mut self, value: &[u8]) -> Result<Box<Program>, String> {
-        let ptr = node_from_bytes(&mut self.0.allocator, value).map_err(|e| e.to_string())?;
-        Ok(Box::new(Program::new(ptr)))
-    }
+//     fn deserialize(&mut self, value: &[u8]) -> Result<Box<Program>, String> {
+//         let ptr = node_from_bytes(&mut self.0.allocator, value).map_err(|e| e.to_string())?;
+//         Ok(Box::new(Program::new(ptr)))
+//     }
 
-    fn alloc(&mut self, value: &ClvmValue) -> Result<Box<Program>, String> {
-        let ptr = value
-            .allocate(&mut self.0.allocator)
-            .map_err(|e| e.to_string())?;
-        Ok(Box::new(Program::new(ptr)))
-    }
-}
+//     fn alloc(&mut self, value: &ClvmValue) -> Result<Box<Program>, String> {
+//         let ptr = value
+//             .allocate(&mut self.0.allocator)
+//             .map_err(|e| e.to_string())?;
+//         Ok(Box::new(Program::new(ptr)))
+//     }
+// }
 
-pub struct Program {
-    pub(crate) ptr: NodePtr,
-}
+// pub struct Program {
+//     pub(crate) ptr: NodePtr,
+// }
 
-impl Program {
-    pub fn new(ptr: NodePtr) -> Self {
-        Self { ptr }
-    }
+// impl Program {
+//     pub fn new(ptr: NodePtr) -> Self {
+//         Self { ptr }
+//     }
 
-    fn is_atom(&self) -> bool {
-        self.ptr.is_atom()
-    }
+//     fn is_atom(&self) -> bool {
+//         self.ptr.is_atom()
+//     }
 
-    fn is_pair(&self) -> bool {
-        self.ptr.is_pair()
-    }
+//     fn is_pair(&self) -> bool {
+//         self.ptr.is_pair()
+//     }
 
-    fn to_string(&self, allocator: &ClvmAllocator) -> Result<String, String> {
-        match allocator.0.allocator.sexp(self.ptr) {
-            SExp::Atom => {
-                let bytes = allocator.0.allocator.atom(self.ptr).as_ref().to_vec();
-                String::from_utf8(bytes).map_err(|e| e.to_string())
-            }
-            SExp::Pair(..) => Err("Cannot convert pair to string".to_string()),
-        }
-    }
-}
+//     fn to_string(&self, allocator: &ClvmAllocator) -> Result<String, String> {
+//         match allocator.0.allocator.sexp(self.ptr) {
+//             SExp::Atom => {
+//                 let bytes = allocator.0.allocator.atom(self.ptr).as_ref().to_vec();
+//                 String::from_utf8(bytes).map_err(|e| e.to_string())
+//             }
+//             SExp::Pair(..) => Err("Cannot convert pair to string".to_string()),
+//         }
+//     }
+// }
 
-pub enum ClvmValue {
-    Float(f64),
-    Integer(u64),
-    String(String),
-    Bool(bool),
-    Program(Program),
-    Bytes(Vec<u8>),
-    Array(Vec<ClvmValue>),
-}
+// pub enum ClvmValue {
+//     Float(f64),
+//     Integer(u64),
+//     String(String),
+//     Bool(bool),
+//     Program(Program),
+//     Bytes(Vec<u8>),
+//     Array(Vec<ClvmValue>),
+// }
 
-pub(crate) trait Allocate {
-    fn allocate(&self, allocator: &mut Allocator) -> Result<NodePtr, String>;
-}
+// pub(crate) trait Allocate {
+//     fn allocate(&self, allocator: &mut Allocator) -> Result<NodePtr, String>;
+// }
 
-impl Allocate for ClvmValue {
-    fn allocate(&self, allocator: &mut Allocator) -> Result<NodePtr, String> {
-        match self {
-            ClvmValue::Float(f) => f.allocate(allocator),
-            ClvmValue::Integer(i) => i.allocate(allocator),
-            ClvmValue::String(s) => s.allocate(allocator),
-            ClvmValue::Bool(b) => b.allocate(allocator),
-            ClvmValue::Bytes(b) => b.allocate(allocator),
-            ClvmValue::Array(arr) => arr.allocate(allocator),
-            ClvmValue::Program(prog) => prog.allocate(allocator),
-        }
-    }
-}
+// impl Allocate for ClvmValue {
+//     fn allocate(&self, allocator: &mut Allocator) -> Result<NodePtr, String> {
+//         match self {
+//             ClvmValue::Float(f) => f.allocate(allocator),
+//             ClvmValue::Integer(i) => i.allocate(allocator),
+//             ClvmValue::String(s) => s.allocate(allocator),
+//             ClvmValue::Bool(b) => b.allocate(allocator),
+//             ClvmValue::Bytes(b) => b.allocate(allocator),
+//             ClvmValue::Array(arr) => arr.allocate(allocator),
+//             ClvmValue::Program(prog) => prog.allocate(allocator),
+//         }
+//     }
+// }
 
-fn new_string_value(value: String) -> Box<ClvmValue> {
-    Box::new(ClvmValue::String(value))
-}
+// fn new_string_value(value: String) -> Box<ClvmValue> {
+//     Box::new(ClvmValue::String(value))
+// }
 
-impl Allocate for f64 {
-    fn allocate(&self, allocator: &mut Allocator) -> Result<NodePtr, String> {
-        if self.is_infinite() {
-            return Err("Value is infinite".to_string());
-        }
+// impl Allocate for f64 {
+//     fn allocate(&self, allocator: &mut Allocator) -> Result<NodePtr, String> {
+//         if self.is_infinite() {
+//             return Err("Value is infinite".to_string());
+//         }
 
-        if self.is_nan() {
-            return Err("Value is NaN".to_string());
-        }
+//         if self.is_nan() {
+//             return Err("Value is NaN".to_string());
+//         }
 
-        if self.fract() != 0.0 {
-            return Err("Value has a fractional part".to_string());
-        }
+//         if self.fract() != 0.0 {
+//             return Err("Value has a fractional part".to_string());
+//         }
 
-        if *self > 9_007_199_254_740_991.0 {
-            return Err("Value is larger than MAX_SAFE_INTEGER".to_string());
-        }
+//         if *self > 9_007_199_254_740_991.0 {
+//             return Err("Value is larger than MAX_SAFE_INTEGER".to_string());
+//         }
 
-        if *self < -9_007_199_254_740_991.0 {
-            return Err("Value is smaller than MIN_SAFE_INTEGER".to_string());
-        }
+//         if *self < -9_007_199_254_740_991.0 {
+//             return Err("Value is smaller than MIN_SAFE_INTEGER".to_string());
+//         }
 
-        let value = *self as i64;
+//         let value = *self as i64;
 
-        if (0..=67_108_863).contains(&value) {
-            allocator
-                .new_small_number(value as u32)
-                .map_err(|e| e.to_string())
-        } else {
-            allocator
-                .new_number(value.into())
-                .map_err(|e| e.to_string())
-        }
-    }
-}
+//         if (0..=67_108_863).contains(&value) {
+//             allocator
+//                 .new_small_number(value as u32)
+//                 .map_err(|e| e.to_string())
+//         } else {
+//             allocator
+//                 .new_number(value.into())
+//                 .map_err(|e| e.to_string())
+//         }
+//     }
+// }
 
-impl Allocate for u64 {
-    fn allocate(&self, allocator: &mut Allocator) -> Result<NodePtr, String> {
-        allocator
-            .new_number((*self).into())
-            .map_err(|e| e.to_string())
-    }
-}
+// impl Allocate for u64 {
+//     fn allocate(&self, allocator: &mut Allocator) -> Result<NodePtr, String> {
+//         allocator
+//             .new_number((*self).into())
+//             .map_err(|e| e.to_string())
+//     }
+// }
 
-impl Allocate for String {
-    fn allocate(&self, allocator: &mut Allocator) -> Result<NodePtr, String> {
-        allocator
-            .new_atom(self.as_bytes())
-            .map_err(|e| e.to_string())
-    }
-}
+// impl Allocate for String {
+//     fn allocate(&self, allocator: &mut Allocator) -> Result<NodePtr, String> {
+//         allocator
+//             .new_atom(self.as_bytes())
+//             .map_err(|e| e.to_string())
+//     }
+// }
 
-impl Allocate for bool {
-    fn allocate(&self, allocator: &mut Allocator) -> Result<NodePtr, String> {
-        allocator
-            .new_small_number(u32::from(*self))
-            .map_err(|e| e.to_string())
-    }
-}
+// impl Allocate for bool {
+//     fn allocate(&self, allocator: &mut Allocator) -> Result<NodePtr, String> {
+//         allocator
+//             .new_small_number(u32::from(*self))
+//             .map_err(|e| e.to_string())
+//     }
+// }
 
-impl Allocate for Vec<u8> {
-    fn allocate(&self, allocator: &mut Allocator) -> Result<NodePtr, String> {
-        allocator.new_atom(self).map_err(|e| e.to_string())
-    }
-}
+// impl Allocate for Vec<u8> {
+//     fn allocate(&self, allocator: &mut Allocator) -> Result<NodePtr, String> {
+//         allocator.new_atom(self).map_err(|e| e.to_string())
+//     }
+// }
 
-impl Allocate for Vec<ClvmValue> {
-    fn allocate(&self, allocator: &mut Allocator) -> Result<NodePtr, String> {
-        let mut items: Vec<NodePtr> = Vec::with_capacity(self.len());
+// impl Allocate for Vec<ClvmValue> {
+//     fn allocate(&self, allocator: &mut Allocator) -> Result<NodePtr, String> {
+//         let mut items: Vec<NodePtr> = Vec::with_capacity(self.len());
 
-        for item in self {
-            let node_ptr = item.allocate(allocator)?;
-            items.push(node_ptr.into());
-        }
+//         for item in self {
+//             let node_ptr = item.allocate(allocator)?;
+//             items.push(node_ptr.into());
+//         }
 
-        items.to_clvm(allocator).map_err(|e| e.to_string())
-    }
-}
+//         items.to_clvm(allocator).map_err(|e| e.to_string())
+//     }
+// }
 
-impl Allocate for Program {
-    fn allocate(&self, _allocator: &mut Allocator) -> Result<NodePtr, String> {
-        Ok(self.ptr)
-    }
-}
+// impl Allocate for Program {
+//     fn allocate(&self, _allocator: &mut Allocator) -> Result<NodePtr, String> {
+//         Ok(self.ptr)
+//     }
+// }
 
-pub fn allocate_value(value: &ClvmValue, allocator: &mut Allocator) -> Result<NodePtr, String> {
-    value.allocate(allocator)
-}
+// pub fn allocate_value(value: &ClvmValue, allocator: &mut Allocator) -> Result<NodePtr, String> {
+//     value.allocate(allocator)
+// }
 
 // // Implementation of the C++ interface
 // impl ClvmValue {

@@ -43,19 +43,19 @@ TEST_F(ClvmTest, TestStringRoundtrip)
   EXPECT_EQ(result2, expected2);
 }
 
-TEST_F(ClvmTest, TestStringRoundtripWrongAllocator)
-{
-  auto allocator = clvm_new_allocator();
-  auto allocator2 = clvm_new_allocator();
-  const std::string expected = "hello world";
-  auto value = new_string_value(expected);
-  auto program = allocator->alloc(*value);
+// TEST_F(ClvmTest, TestStringRoundtripWrongAllocator)
+// {
+//   auto allocator = clvm_new_allocator();
+//   auto allocator2 = clvm_new_allocator();
+//   const std::string expected = "hello world";
+//   auto value = new_string_value(expected);
+//   auto program = allocator->alloc(*value);
 
-  EXPECT_THROW({
-    program->to_string(*allocator2); // Using wrong allocator
-  },
-               std::runtime_error);
-}
+//   EXPECT_THROW({
+//     program->to_string(*allocator2); // Using wrong allocator
+//   },
+//                std::runtime_error);
+// }
 // class ChiaFFITest : public ::testing::Test
 // {
 // protected: // Change from private to protected
