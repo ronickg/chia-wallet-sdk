@@ -1,0 +1,82 @@
+# The language to output bindings in
+#
+# possible values: "C", "C++", "Cython"
+#
+# default: "C++"
+language = "C++"
+
+include_guard = "CHIA_WALLET_FFI_H"
+
+# Header configuration
+after_includes = """
+
+typedef struct {
+    uint8_t data[32];
+} Bytes32;
+typedef struct {
+    uint8_t data[48];
+} Bytes48;
+typedef struct {
+    uint8_t data[96];
+} Bytes96;
+typedef struct {
+    uint8_t data[100];
+} Bytes100;
+
+typedef struct Simulator Simulator;
+
+template<typename T>
+struct Option {
+    bool is_present;  // Corresponds to Rust's discriminant
+    T value;         // The actual value storage
+
+    // Default constructor creates None
+    Option() : is_present(false) {}
+
+    // Create Some variant
+    static Option<T> some(const T& val) {
+        Option<T> opt;
+        opt.is_present = true;
+        opt.value = val;
+        return opt;
+    }
+
+    // Create None variant
+    static Option<T> none() {
+        return Option<T>();
+    }
+
+    bool has_value() const {
+        return is_present;
+    }
+
+    const T& unwrap() const {
+        if (!is_present) {
+            throw std::runtime_error("Attempted to unwrap None value");
+        }
+        return value;
+    }
+};
+
+// Allow conversion from nullptr to Option<T*>
+template<typename T>
+Option<T*> from_nullable(T* ptr) {
+    if (ptr == nullptr) {
+        return Option<T*>::none();
+    }
+    return Option<T*>::some(ptr);
+}
+
+struct Coin {
+    Bytes32 parent_coin_info;
+    Bytes32 puzzle_hash;
+    uint64_t amount;
+};
+
+struct NodePtr;
+struct ClvmValue;
+
+"""
+
+[export]
+include = ["Bytes32"]

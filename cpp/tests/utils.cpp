@@ -4,6 +4,60 @@
 #include <string>
 #include "lib.rs.h"
 #include <algorithm> // For std::equal
+#include <iostream>
+class ClvmAllocatorWrapper
+{
+public:
+  ClvmAllocatorWrapper() : allocator(new_clvm()) {}
+
+  rust::Box<Program> alloc(rust::Box<ClvmValue> &&value)
+  {
+    return allocator->alloc(*value);
+  }
+
+  rust::Box<Program> nil()
+  {
+    return allocator->nil();
+  }
+
+private:
+  rust::Box<ClvmAllocator> allocator;
+};
+
+class ClvmValueWrapper
+{
+public:
+  static rust::Box<ClvmValue> from_int(int64_t value)
+  {
+    return new_int_value(value);
+  }
+
+  static rust::Box<ClvmValue> from_string(const std::string &value)
+  {
+    return new_string_value(rust::String(value));
+  }
+
+  static rust::Box<ClvmValue> from_bool(bool value)
+  {
+    return new_bool_value(value);
+  }
+
+  static rust::Box<ClvmValue> from_bytes(const std::vector<uint8_t> &bytes)
+  {
+    rust::Vec<uint8_t> vec;
+    vec.reserve(bytes.size());
+    for (auto b : bytes)
+    {
+      vec.push_back(b);
+    }
+    return new_bytes_value(vec);
+  }
+
+  static rust::Box<ClvmValue> from_program(rust::Box<Program> &&program)
+  {
+    return new_program_value(std::move(program));
+  }
+};
 
 class ClvmTest : public ::testing::Test
 {
@@ -24,14 +78,23 @@ protected:
 //   auto result = program->to_string(*allocator);
 //   std::cout << "Program string: " << result << std::endl;
 // }
+TEST_F(ClvmTest, Hey)
+{
+  ClvmAllocatorWrapper clvm;
+
+  // Create shared programs
+  auto shared1 = clvm.alloc(ClvmValueWrapper::from_int(42));
+  auto shared2 = clvm.alloc(ClvmValueWrapper::from_int(42));
+}
+
 TEST_F(ClvmTest, TestStringRoundtrip)
 {
-  auto allocator = clvm_new_allocator();
+  auto allocator = new_clvm();
   const std::string expected1 = "hello world";
   auto value1 = new_string_value(expected1);
   auto program1 = allocator->alloc(*value1);
 
-  auto allocator2 = clvm_new_allocator();
+  auto allocator2 = new_clvm();
   const std::string expected2 = "test string";
   auto value2 = new_string_value(expected2);
   auto program2 = allocator2->alloc(*value2);
@@ -43,6 +106,200 @@ TEST_F(ClvmTest, TestStringRoundtrip)
   EXPECT_EQ(result2, expected2);
 }
 
+// Utility function to compare two byte arrays
+bool compareBytes(const rust::Vec<uint8_t> &a, const rust::Vec<uint8_t> &b)
+{
+  return std::equal(a.begin(), a.end(), b.begin());
+}
+
+bool compareBytes1(const std::array<uint8_t, 32> &a, const std::array<uint8_t, 32> &b)
+{
+  return std::equal(a.begin(), a.end(), b.begin());
+}
+
+std::string rustStringToStdString(const rust::String &rust_str)
+{
+  return std::string(rust_str.data(), rust_str.size());
+}
+
+void logHex(const std::string &label, const rust::Vec<uint8_t> &vec)
+{
+  rust::String rust_hex_string = to_hex(vec);                      // Call the exposed Rust function
+  std::string hex_string = rustStringToStdString(rust_hex_string); // Convert to std::string
+
+  std::cout << label << ": " << hex_string << std::endl;
+}
+
+TEST_F(ClvmTest, AtomRoundtrip)
+{
+  auto allocator = new_clvm();
+
+  rust::Vec<uint8_t> expected = {1, 2, 3};
+  logHex("Expected (hex)", expected);
+
+  auto atom = allocator->alloc(*new_bytes_value(expected));
+  auto result = atom->to_atom(*allocator);
+
+  logHex("Result (hex)", result);
+
+  EXPECT_TRUE(compareBytes(result, expected));
+}
+
+// TEST_F(ClvmTest, ClvmValueAllocation)
+// {
+//   auto clvm = new_clvm();
+//   auto shared1 = clvm->alloc(*new_int_value(42));
+//   auto shared2 = clvm->alloc(*new_int_value(42));
+
+//   auto builder1 = array_builder();
+//   builder1->add_int(42)
+//       .add_string("Hello, world!")
+//       .add_bool(true)
+//       .add_bytes(rust::Vec<uint8_t>{1, 2, 3})
+//       .add_array(build_from_array(std::move(array_builder()))) // Move the builder
+//       .add_int(100)
+//       .add_program(std::move(shared1));
+
+//   auto manual = clvm->alloc(*build_from_array(std::move(builder1)));
+
+//   auto builder2 = array_builder();
+//   builder2->add_int(42)
+//       .add_string("Hello, world!")
+//       .add_bool(true)
+//       .add_bytes(rust::Vec<uint8_t>{1, 2, 3})
+//       .add_array(build_from_array(std::move(array_builder()))) // Move the builder
+//       .add_int(100)
+//       .add_program(std::move(shared2));
+
+//   auto automatic = clvm->alloc(*build_from_array(std::move(builder2)));
+
+//   auto manual_tree_hash = clvm->tree_hash(*manual);
+//   auto auto_tree_hash = clvm->tree_hash(*automatic);
+//   EXPECT_TRUE(compareBytes1(manual_tree_hash, auto_tree_hash));
+// }
+TEST_F(ClvmTest, ClvmValueAllocation)
+{
+  auto clvm = new_clvm();
+  auto shared1 = clvm->alloc(*new_int_value(42));
+  auto shared2 = clvm->alloc(*new_int_value(42));
+
+  auto inner_array1 = array_builder();
+  inner_array1->add_value(new_int_value(34));
+  auto inner_value1 = build_from_array(std::move(inner_array1));
+
+  auto builder1 = array_builder();
+  builder1->add_value(new_int_value(42))
+      .add_value(new_string_value("Hello, world!"))
+      .add_value(new_bool_value(true))
+      .add_value(new_bytes_value(rust::Vec<uint8_t>{1, 2, 3}))
+      .add_value(std::move(inner_value1))
+      .add_value(new_int_value(100))
+      .add_value(new_program_value(std::move(shared1)));
+
+  auto manual = clvm->alloc(*build_from_array(std::move(builder1)));
+
+  auto inner_array2 = array_builder();
+  inner_array2->add_value(new_int_value(34));
+  auto inner_value2 = build_from_array(std::move(inner_array2));
+
+  auto builder2 = array_builder();
+  builder2->add_value(new_int_value(42))
+      .add_value(new_string_value("Hello, world!"))
+      .add_value(new_bool_value(true))
+      .add_value(new_bytes_value(rust::Vec<uint8_t>{1, 2, 3}))
+      .add_value(std::move(inner_value2))
+      .add_value(new_int_value(100))
+      .add_value(new_program_value(std::move(shared2)));
+
+  auto automatic = clvm->alloc(*build_from_array(std::move(builder2)));
+
+  auto manual_tree_hash = clvm->tree_hash(*manual);
+  auto auto_tree_hash = clvm->tree_hash(*automatic);
+  EXPECT_TRUE(compareBytes1(manual_tree_hash, auto_tree_hash));
+}
+// TEST_F(ClvmTest, ClvmValueAllocation)
+// {
+//   auto clvm = new_clvm();
+//   auto shared1 = clvm->alloc(*new_int_value(42));
+//   auto shared2 = clvm->alloc(*new_int_value(42));
+
+//   auto builder1 = array_builder();
+//   builder1->add_value(new_int_value(42))
+//       .add_value(new_string_value("Hello, world!"))
+//       .add_value(new_bool_value(true))
+//       .add_value(new_bytes_value(rust::Vec<uint8_t>{1, 2, 3}))
+//       .add_value(build_from_array(std::move(array_builder())))
+//       .add_value(new_int_value(100))
+//       .add_value(new_program_value(std::move(shared1)));
+
+//   auto manual = clvm->alloc(*build_from_array(std::move(builder1)));
+
+//   auto builder2 = array_builder();
+//   builder2->add_value(new_int_value(42))
+//       .add_value(new_string_value("Hello, world!"))
+//       .add_value(new_bool_value(true))
+//       .add_value(new_bytes_value(rust::Vec<uint8_t>{1, 2, 3}))
+//       .add_value(build_from_array(std::move(array_builder())))
+//       .add_value(new_int_value(100))
+//       .add_value(new_program_value(std::move(shared2)));
+
+//   auto automatic = clvm->alloc(*build_from_array(std::move(builder2)));
+
+//   auto manual_tree_hash = clvm->tree_hash(*manual);
+//   auto auto_tree_hash = clvm->tree_hash(*automatic);
+//   EXPECT_TRUE(compareBytes1(manual_tree_hash, auto_tree_hash));
+// }
+// TEST_F(ClvmTest, ClvmValueAllocation)
+// {
+//   auto clvm = new_clvm();
+
+//   // Create a shared value (42)
+//   auto shared1 = clvm->alloc(*new_int_value(42));
+//   auto shared2 = clvm->alloc(*new_int_value(42)); // Create a second instance since we need to move it twice
+
+//   // Create the manual array with all values individually allocated
+//   auto manual_array = create_empty_clvm_value_array();
+//   append_to_clvm_value_array(*manual_array, new_int_value(42));
+//   append_to_clvm_value_array(*manual_array, new_string_value("Hello, world!"));
+//   append_to_clvm_value_array(*manual_array, new_bool_value(true));
+//   append_to_clvm_value_array(*manual_array, new_bytes_value(rust::Vec<uint8_t>{1, 2, 3}));
+
+//   // Create nested array with [34]
+//   auto nested_array = create_empty_clvm_value_array();
+//   append_to_clvm_value_array(*nested_array, new_int_value(34));
+//   append_to_clvm_value_array(*manual_array, finalize_clvm_value_array(std::move(nested_array)));
+
+//   append_to_clvm_value_array(*manual_array, new_int_value(100));
+//   append_to_clvm_value_array(*manual_array, new_program_value(std::move(shared1)));
+
+//   // Finalize the manual array
+//   auto manual_clvm_value = finalize_clvm_value_array(std::move(manual_array));
+//   auto manual = clvm->alloc(*manual_clvm_value);
+
+//   // Create the automatic array (matching the JS auto version)
+//   auto auto_array = create_empty_clvm_value_array();
+//   append_to_clvm_value_array(*auto_array, new_int_value(42));
+//   append_to_clvm_value_array(*auto_array, new_string_value("Hello, world!"));
+//   append_to_clvm_value_array(*auto_array, new_bool_value(true));
+//   append_to_clvm_value_array(*auto_array, new_bytes_value(rust::Vec<uint8_t>{1, 2, 3}));
+
+//   // Create nested array with [34]
+//   auto auto_nested_array = create_empty_clvm_value_array();
+//   append_to_clvm_value_array(*auto_nested_array, new_int_value(34));
+//   append_to_clvm_value_array(*auto_array, finalize_clvm_value_array(std::move(auto_nested_array)));
+
+//   append_to_clvm_value_array(*auto_array, new_int_value(100));
+//   append_to_clvm_value_array(*auto_array, new_program_value(std::move(shared2)));
+
+//   // Finalize the automatic array
+//   auto auto_clvm_value = finalize_clvm_value_array(std::move(auto_array));
+//   auto automatic = clvm->alloc(*auto_clvm_value);
+
+//   // Compare tree hashes
+//   auto manual_tree_hash = clvm->tree_hash(*manual);
+//   auto auto_tree_hash = clvm->tree_hash(*automatic);
+//   EXPECT_TRUE(compareBytes1(manual_tree_hash, auto_tree_hash));
+// }
 // TEST_F(ClvmTest, TestStringRoundtripWrongAllocator)
 // {
 //   auto allocator = clvm_new_allocator();

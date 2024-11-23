@@ -38,66 +38,27 @@ impl Program {
             SExp::Pair(..) => Err("Cannot convert pair to string".to_string()),
         }
     }
+
+    // pub fn to_bytes(&self, allocator: &ClvmAllocator) -> Result<Vec<u8>, String> {
+    //     node_to_bytes(allocator.0.allocator, self.ptr).map_err(|e| e.to_string())
+    // }
+
+    // #[napi]
+    // pub fn to_atom(&self) -> Result<Option<Uint8Array>> {
+    //     match self.alloc().sexp(self.ptr) {
+    //         SExp::Atom => Ok(Some(
+    //             self.alloc().atom(self.ptr).as_ref().to_vec().into_js()?,
+    //         )),
+    //         SExp::Pair(..) => Ok(None),
+    //     }
+    // }
+    pub fn to_atom(&self, allocator: &ClvmAllocator) -> Result<Vec<u8>, String> {
+        match allocator.0.allocator.sexp(self.ptr) {
+            SExp::Atom => {
+                let bytes = allocator.0.allocator.atom(self.ptr).as_ref().to_vec();
+                Ok(bytes)
+            }
+            SExp::Pair(..) => Err("Cannot convert pair to atom".to_string()),
+        }
+    }
 }
-
-// // Wrapper type for NodePtr
-// #[derive(Clone, Copy)]
-// pub struct NodePtrWrapper(NodePtr);
-
-// impl From<NodePtr> for NodePtrWrapper {
-//     fn from(ptr: NodePtr) -> Self {
-//         NodePtrWrapper(ptr)
-//     }
-// }
-
-// impl From<NodePtrWrapper> for NodePtr {
-//     fn from(wrapper: NodePtrWrapper) -> Self {
-//         wrapper.0
-//     }
-// }
-
-// pub struct Program {
-//     pub(crate) ctx: Box<ClvmAllocator>, // Rust-managed allocator
-//     pub(crate) ptr: NodePtrWrapper,
-// }
-
-// // Implement the functions at module level to match the FFI declarations
-// pub fn new_program(allocator: Box<ClvmAllocator>, ptr: &NodePtrWrapper) -> Box<Program> {
-//     Box::new(Program {
-//         ctx: allocator,
-//         ptr: *ptr,
-//     })
-// }
-
-// impl Program {
-//     pub fn is_atom(&self) -> bool {
-//         NodePtr::from(self.ptr).is_atom()
-//     }
-
-//     pub fn is_pair(&self) -> bool {
-//         NodePtr::from(self.ptr).is_pair()
-//     }
-
-//     pub fn tree_hash(&self) -> Result<Vec<u8>, String> {
-//         Ok(tree_hash(&self.ctx.0.allocator, self.ptr.into())
-//             .to_bytes()
-//             .to_vec())
-//     }
-
-//     pub fn serialize(&self) -> Result<Vec<u8>, String> {
-//         node_to_bytes(&self.ctx.0.allocator, self.ptr.into()).map_err(|e| e.to_string())
-//     }
-
-//     pub fn to_atom(&self) -> Result<OptionalVec, String> {
-//         match self.ctx.0.allocator.sexp(NodePtr::from(self.ptr)) {
-//             SExp::Atom => Ok(OptionalVec {
-//                 has_value: true,
-//                 data: self.ctx.0.allocator.atom(self.ptr.into()).as_ref().to_vec(),
-//             }),
-//             _ => Ok(OptionalVec {
-//                 has_value: false,
-//                 data: Vec::new(),
-//             }),
-//         }
-//     }
-// }

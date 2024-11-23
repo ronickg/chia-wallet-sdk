@@ -1,21 +1,31 @@
-use crate::{Allocate, ClvmValue, Program};
+use crate::{ffi::Output, Allocate, ClvmValue, Program};
 use chia::{
-    clvm_traits::{ClvmDecoder, FromClvm},
-    clvm_utils::{tree_hash, CurriedProgram},
+    bls,
+    clvm_traits::{clvm_quote, ClvmEncoder, FromClvm, ToClvm},
+    clvm_utils::{self, CurriedProgram, TreeHash},
+    protocol::{self, Bytes32},
+    puzzles::nft::{self, NFT_METADATA_UPDATER_PUZZLE_HASH},
 };
-use chia_wallet_sdk::SpendContext;
+use chia_wallet_sdk::{self as sdk, HashedPtr, SpendContext};
 use clvmr::{
-    serde::{node_from_bytes, node_from_bytes_backrefs, node_to_bytes, node_to_bytes_backrefs},
-    Allocator, NodePtr,
+    run_program,
+    serde::{node_from_bytes, node_from_bytes_backrefs},
+    ChiaDialect, NodePtr, MEMPOOL_MODE,
 };
+
 pub struct ClvmAllocator(pub(crate) SpendContext);
 
-pub fn clvm_new_allocator() -> Box<ClvmAllocator> {
+pub fn new_clvm() -> Box<ClvmAllocator> {
     Box::new(ClvmAllocator(SpendContext::new()))
 }
 
+// pub struct Output {
+//     pub cost: u64,
+//     pub value: Box<Program>,
+// }
+
 impl ClvmAllocator {
-    pub fn new_allocator() -> Box<Self> {
+    pub fn new() -> Box<Self> {
         Box::new(Self(SpendContext::new()))
     }
 
@@ -23,9 +33,90 @@ impl ClvmAllocator {
         Box::new(Program::new(NodePtr::NIL))
     }
 
-    pub fn deserialize(&mut self, value: &[u8]) -> Result<Box<Program>, String> {
-        let ptr = node_from_bytes(&mut self.0.allocator, value).map_err(|e| e.to_string())?;
+    pub fn deserialize(&mut self, value: Vec<u8>) -> Result<Box<Program>, String> {
+        let ptr = node_from_bytes(&mut self.0.allocator, &value).map_err(|e| e.to_string())?;
         Ok(Box::new(Program::new(ptr)))
+    }
+
+    pub fn deserialize_with_backrefs(
+        &mut self,
+        value: Vec<u8>, // Accepts a byte slice
+    ) -> Result<Box<Program>, String> {
+        let ptr =
+            node_from_bytes_backrefs(&mut self.0.allocator, &value).map_err(|e| e.to_string())?;
+        Ok(Box::new(Program::new(ptr)))
+    }
+
+    pub fn tree_hash(&self, program: &Program) -> Result<[u8; 32], String> {
+        let hash = self.0.tree_hash(program.ptr);
+        Ok(hash.to_bytes())
+    }
+
+    pub fn run(
+        &mut self,
+        puzzle: &Program,
+        solution: &Program,
+        max_cost: u64,
+        mempool_mode: bool,
+    ) -> Result<Output, String> {
+        let mut flags = 0;
+
+        if mempool_mode {
+            flags |= MEMPOOL_MODE;
+        }
+
+        let result = run_program(
+            &mut self.0.allocator,
+            &ChiaDialect::new(flags),
+            puzzle.ptr,
+            solution.ptr,
+            max_cost,
+        )
+        .map_err(|error| error.to_string())?;
+
+        Ok(Output {
+            value: Box::new(Program::new(result.1)),
+            cost: result.0,
+        })
+    }
+
+    pub fn curry(&mut self, program: &Program, args: Vec<Program>) -> Result<Box<Program>, String> {
+        let mut args_ptr = self.0.allocator.one();
+
+        for arg in args.into_iter().rev() {
+            args_ptr = self
+                .0
+                .allocator
+                .encode_curried_arg(arg.ptr, args_ptr)
+                .map_err(|error| error.to_string())?;
+        }
+
+        let ptr = self
+            .0
+            .alloc(&CurriedProgram {
+                program: program.ptr,
+                args: args_ptr,
+            })
+            .map_err(|error| error.to_string())?;
+
+        Ok(Box::new(Program::new(ptr)))
+    }
+
+    pub fn pair(&mut self, first: &ClvmValue, rest: &ClvmValue) -> Result<Box<Program>, String> {
+        let first_ptr = first
+            .allocate(&mut self.0.allocator)
+            .map_err(|e| e.to_string())?;
+        let rest_ptr = rest
+            .allocate(&mut self.0.allocator)
+            .map_err(|e| e.to_string())?;
+
+        let pair_ptr = self
+            .0
+            .allocator
+            .new_pair(first_ptr, rest_ptr)
+            .map_err(|e| e.to_string())?;
+
+        Ok(Box::new(Program::new(pair_ptr)))
     }
 
     pub fn alloc(&mut self, value: &ClvmValue) -> Result<Box<Program>, String> {
@@ -35,86 +126,3 @@ impl ClvmAllocator {
         Ok(Box::new(Program::new(ptr)))
     }
 }
-
-// use chia::{
-//     clvm_traits::{ClvmDecoder, FromClvm},
-//     clvm_utils::{tree_hash, CurriedProgram},
-// };
-// use chia_wallet_sdk::SpendContext;
-// use clvmr::{
-//     serde::{node_from_bytes, node_from_bytes_backrefs, node_to_bytes, node_to_bytes_backrefs},
-//     Allocator, NodePtr,
-// };
-
-// use crate::{clvm_value::Allocate, ffi::ClvmResult, ClvmValue, NodePtrWrapper, Program};
-
-// pub struct ClvmAllocator(pub(crate) SpendContext);
-
-// impl ClvmAllocator {
-//     pub fn new() -> Result<Self, String> {
-//         Ok(Self(SpendContext::new()))
-//     }
-
-//     pub fn get_allocator(&mut self) -> &mut Allocator {
-//         &mut self.0.allocator
-//     }
-// }
-
-// // Implementation of the extern functions for cxx
-// pub fn deserialize(allocator: &mut ClvmAllocator, bytes: &[u8]) -> Result<Box<Program>, String> {
-//     match node_from_bytes(&mut allocator.0.allocator, bytes) {
-//         Ok(ptr) => Ok(Box::new(Program {
-//             ctx: Box::new(ClvmAllocator(SpendContext::new())),
-//             ptr: NodePtrWrapper::from(ptr),
-//         })),
-//         Err(e) => Err(e.to_string()),
-//     }
-// }
-
-// pub fn nil(allocator: &mut ClvmAllocator) -> Result<Box<Program>, String> {
-//     Ok(Box::new(Program {
-//         ctx: Box::new(ClvmAllocator(SpendContext::new())),
-//         ptr: NodePtrWrapper::from(NodePtr::NIL),
-//     }))
-// }
-
-// pub fn alloc(allocator: &mut ClvmAllocator, value: &ClvmValue) -> Result<Box<Program>, String> {
-//     match value.allocate(allocator) {
-//         Ok(ptr) => Ok(Box::new(Program {
-//             ctx: allocator, // Use the passed allocator directly
-//             ptr,
-//         })),
-//         Err(e) => Err(e.to_string()),
-//     }
-// }
-// // pub fn alloc(allocator: &mut ClvmAllocator, value: &ClvmValue) -> ClvmResult {
-// //     match value.allocate(allocator) {
-// //         Ok(ptr) => ClvmResult {
-// //             success: true,
-// //             error: String::new(),
-// //             node_ptr_value: Box::new(ptr),
-// //         },
-// //         Err(e) => ClvmResult {
-// //             success: false,
-// //             error: e.to_string(),
-// //             node_ptr_value: Box::new(NodePtrWrapper::from(NodePtr::NIL)),
-// //         },
-// //     }
-// // }
-
-// pub fn deserialize_with_backrefs(
-//     allocator: &mut ClvmAllocator,
-//     bytes: &[u8],
-// ) -> Result<Box<Program>, String> {
-//     match node_from_bytes_backrefs(&mut allocator.0.allocator, bytes) {
-//         Ok(ptr) => Ok(Box::new(Program {
-//             ctx: Box::new(ClvmAllocator(SpendContext::new())),
-//             ptr: NodePtrWrapper::from(ptr),
-//         })),
-//         Err(e) => Err(e.to_string()),
-//     }
-// }
-
-// pub fn create_allocator() -> Box<ClvmAllocator> {
-//     Box::new(ClvmAllocator::new().unwrap())
-// }

@@ -1,5 +1,5 @@
 [package]
-name = "chia-wallet-sdk-cpp-bindings"
+name = "chia-wallet-sdk-c-bindings"
 version = "0.0.0"
 edition = "2021"
 
@@ -12,8 +12,8 @@ edition = "2021"
 unsafe_code = "allow"
 
 [lib]
-crate-type = ["staticlib"]
-name = "chia_wallet_sdk_cpp_bindings"
+crate-type = ["staticlib", "cdylib"]
+name = "chia_wallet_sdk_c_bindings"
 
 [dependencies]
 bip39 = { workspace = true, features = ["rand", "rand_core"] }
@@ -24,6 +24,7 @@ num-bigint = { workspace = true }
 hex = { workspace = true }
 paste = { workspace = true }
 thiserror = { workspace = true }
+libc = "0.2.164"
 # cxx = "1.0"
 
 
